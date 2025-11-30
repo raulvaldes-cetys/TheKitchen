@@ -99,5 +99,30 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
+router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const foodItem = await prisma.foodItem.findUnique({
+      where: { foodId: req.params.id },
+      include: { restaurant: true },
+    });
+
+    if (!foodItem) {
+      return res.status(404).json({ error: 'Food item not found' });
+    }
+
+    if (foodItem.restaurant.ownerId !== req.userId) {
+      return res.status(403).json({ error: 'Only restaurant owner can delete food items' });
+    }
+
+    await prisma.foodItem.delete({
+      where: { foodId: req.params.id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete food item' });
+  }
+});
+
 export default router;
 
