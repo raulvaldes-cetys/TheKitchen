@@ -25,6 +25,8 @@ router.post('/register', async (req, res) => {
     });
 
     const token = generateToken(user.userId);
+    console.log(`[Auth] Token generated for user ${user.userId} (${user.email})`);
+    console.log(`[Auth] Token length: ${token.length} characters`);
 
     res.status(201).json({ user, token });
   } catch (error) {
@@ -47,10 +49,13 @@ router.post('/login', async (req, res) => {
 
     const isValid = await comparePassword(password, user.password);
     if (!isValid) {
+      console.log(`[Auth] Login failed - invalid password for ${email}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = generateToken(user.userId);
+    console.log(`[Auth] Token generated for user ${user.userId} (${user.email})`);
+    console.log(`[Auth] Token length: ${token.length} characters`);
 
     res.json({
       user: {

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import authRoutes from './routes/auth';
@@ -28,6 +28,69 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Request/Response logging middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
+  const timestamp = new Date().toISOString();
+
+  // Log incoming request
+  console.log('\n' + '='.repeat(80));
+  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  console.log(`Origin: ${req.get('origin') || 'N/A'}`);
+  
+  // Log Authorization header (mask token for security)
+  const authHeader = req.get('authorization');
+  if (authHeader) {
+    const tokenPreview = authHeader.startsWith('Bearer ') 
+      ? `Bearer ${authHeader.substring(7, 20)}...` 
+      : 'Bearer <missing>';
+    console.log(`Authorization: ${tokenPreview}`);
+  } else {
+    console.log('Authorization: <not provided>');
+  }
+
+  // Log request body (exclude sensitive fields)
+  if (req.body && Object.keys(req.body).length > 0) {
+    const sanitizedBody = { ...req.body };
+    if (sanitizedBody.password) {
+      sanitizedBody.password = '***REDACTED***';
+    }
+    console.log('Request Body:', JSON.stringify(sanitizedBody, null, 2));
+  }
+
+  // Capture response data
+  const originalSend = res.send;
+  res.send = function (body: any) {
+    const duration = Date.now() - startTime;
+    
+    // Log response
+    console.log(`[${timestamp}] ${req.method} ${req.path} - Status: ${res.statusCode} (${duration}ms)`);
+    
+    // Log response body (truncate if too long)
+    if (body) {
+      try {
+        const responseBody = typeof body === 'string' ? JSON.parse(body) : body;
+        const bodyStr = JSON.stringify(responseBody, null, 2);
+        if (bodyStr.length > 500) {
+          console.log('Response Body:', bodyStr.substring(0, 500) + '... (truncated)');
+        } else {
+          console.log('Response Body:', bodyStr);
+        }
+      } catch (e) {
+        // Not JSON, log as-is (truncated)
+        const bodyStr = String(body);
+        console.log('Response Body:', bodyStr.length > 500 ? bodyStr.substring(0, 500) + '...' : bodyStr);
+      }
+    }
+    
+    console.log('='.repeat(80) + '\n');
+    
+    return originalSend.call(this, body);
+  };
+
+  next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
